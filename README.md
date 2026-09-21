@@ -1,7 +1,3 @@
-  <p align="center">
-    <img src="assets/myjev-banner.jpeg" alt="MyJev" width="100%">
-  </p>
-
 # MyJev
 
 [简体中文](README_zh.md)
@@ -55,6 +51,64 @@ $env:OPENAI_API_KEY = "your-api-key"
 The API must expose first-token top logprobs containing both `yes` and `no`.
 Providers differ in tokenization and logprob exposure, so this backend is
 approximate rather than an exact substitute for local logits.
+
+## Example
+
+```python
+from myjev import Choice, JevRequest, MyJev, Noul, OpenAICompatibleBackend
+
+backend = OpenAICompatibleBackend(
+    base_url="https://your-openai-compatible-service/v1",
+    api_key="your-api-key",
+    top_logprobs=20,
+)
+request = JevRequest(
+    model="your-model-name",
+    state="The customer says a card was charged twice and asks for a refund.",
+    questions={
+        "department": Choice(
+            instructions="Which department should handle this request?",
+            criteria={
+                "billing": "Charges and billing",
+                "returns": "Returns and exchanges",
+            },
+        ),
+        "refund": Noul(instructions="Is the customer asking for a refund?"),
+    },
+)
+
+response = MyJev(backend=backend).evaluate(request)
+print(response.json)
+```
+
+An illustrative response is:
+
+```json
+{
+  "model": "your-model-name",
+  "answers": {
+    "department": {
+      "type": "choice",
+      "choice": "billing",
+      "confidence": 0.50,
+      "probabilities": {
+        "billing": 0.75,
+        "returns": 0.25
+      }
+    },
+    "refund": {
+      "type": "noul",
+      "noul": 0.92
+    }
+  },
+  "usage": {
+    "input_tokens": 38,
+    "output_tokens": 0
+  }
+}
+```
+
+The probabilities are model-derived scores; the values above are only an example.
 
 ## How it works
 

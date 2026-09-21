@@ -1,7 +1,3 @@
-  <p align="center">
-    <img src="assets/myjev-banner.jpeg" alt="MyJev" width="100%">
-  </p>
-
 # MyJev
 
 [English](README.md)
@@ -54,6 +50,64 @@ $env:OPENAI_API_KEY = "your-api-key"
 API 必须暴露首生成 token 的 top logprobs，并且窗口中同时包含 `yes` 和 `no`。
 不同服务的分词和 logprobs 暴露方式不同，因此这个后端是近似实现，不是本地
 logits 的完全等价替代。
+
+## 示例
+
+```python
+from myjev import Choice, JevRequest, MyJev, Noul, OpenAICompatibleBackend
+
+backend = OpenAICompatibleBackend(
+    base_url="https://your-openai-compatible-service/v1",
+    api_key="your-api-key",
+    top_logprobs=20,
+)
+request = JevRequest(
+    model="your-model-name",
+    state="客户说信用卡被重复扣款，并要求退款。",
+    questions={
+        "department": Choice(
+            instructions="哪个部门应该处理这个请求？",
+            criteria={
+                "billing": "扣款和账单",
+                "returns": "退货和换货",
+            },
+        ),
+        "refund": Noul(instructions="客户是否要求退款？"),
+    },
+)
+
+response = MyJev(backend=backend).evaluate(request)
+print(response.json)
+```
+
+输出结构示例如下：
+
+```json
+{
+  "model": "your-model-name",
+  "answers": {
+    "department": {
+      "type": "choice",
+      "choice": "billing",
+      "confidence": 0.50,
+      "probabilities": {
+        "billing": 0.75,
+        "returns": 0.25
+      }
+    },
+    "refund": {
+      "type": "noul",
+      "noul": 0.92
+    }
+  },
+  "usage": {
+    "input_tokens": 38,
+    "output_tokens": 0
+  }
+}
+```
+
+概率来自模型的候选评分，上面的数值只是示例。
 
 ## 工作方式
 
