@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "myjev"
+version = "0.1.0"
+description = "Adapt language models to Jev-style structured questions."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "MercatorProj" },
+]
+maintainers = [
+    { name = "MercatorProj" },
+]
+keywords = ["llm", "structured-output", "classification", "logits", "probabilities"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/MercatorProj/MyJev"
+Repository = "https://github.com/MercatorProj/MyJev"
+Issues = "https://github.com/MercatorProj/MyJev/issues"
+
+[project.scripts]
+myjev-serve = "myjev.sglang_server:main"
+
+[project.optional-dependencies]
+transformers = [
+    "torch>=2.0",
+    "transformers>=4.51",
+]
+sglang = [
+    "sglang; sys_platform == 'linux'",
+]
+
+[tool.uv]
+constraint-dependencies = [
+    # SGLang 0.5.20 pins this prerelease; the constraint keeps uv's
+    # prerelease allowance local to that transitive dependency.
+    "cuda-tile==1.6.0rc5; sys_platform == 'linux'",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
