@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: src
     strategy:
       fail-fast: false
       matrix:

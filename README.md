@@ -83,7 +83,10 @@ assets/          Diagrams and images
 
 ## Development
 
+Install the package in editable mode first so tests can import `myjev` from `src/`:
+
 ```bash
+pip install -e .
 python -m unittest discover -s tests -v
 python -m compileall -q src tests
 ```
