@@ -1,75 +1,105 @@
-
   <p align="center">
     <img src="assets/myjev-banner.jpeg" alt="MyJev" width="100%">
   </p>
 
-# MyJev: structured decisions from language models
+# MyJev
 
 [简体中文](README_zh.md)
 
-MyJev adapts language models to Jev-style structured decisions. It accepts runtime-defined `Choice`, `Score`, and `Noul` questions and returns typed answers with probabilities.
+[![Tests](https://github.com/MercatorProj/MyJev/actions/workflows/test.yml/badge.svg)](https://github.com/MercatorProj/MyJev/actions/workflows/test.yml)
 
-> MyJev is an independent open-source project. It is not affiliated with or endorsed by Jev or TypeSafe.
+**MyJev is a lightweight Jev wrapper for language models.** It turns runtime-defined `Choice`, `Score`, and `Noul` questions into prefill-only yes/no judgments, then returns typed answers with normalized probabilities.
 
-## Backend support
+The design is inspired by [LLM2Jev](https://github.com/Yinsongxu/LLM2Jev). MyJev independently implements that idea as a small Python layer around existing model APIs and runtimes. It does not train, fine-tune, host, or modify models.
 
-| Backend | Best for | Requirements | Prefix-cache staging |
-| --- | --- | --- | --- |
-| OpenAI-compatible | Managed APIs and existing model services | An API that returns first-token top logprobs | Not applicable |
-| SGLang | High-throughput local inference on NVIDIA GPUs | Linux, supported NVIDIA GPU, `myjev[sglang]` | Yes |
-| Transformers | Local tests, research, and CPU/CUDA fallback | `myjev[transformers]` | No |
+MyJev is an independent open-source project. It is not affiliated with or endorsed by Jev, TypeSafe, or the LLM2Jev authors.
 
-The OpenAI-compatible backend does not train, host, or fine-tune models. It calls your existing model API.
+## Why MyJev
 
-## Quick start with a model API
+- Keep the request schema compact: express options and levels directly in a `JevRequest`.
+- Avoid free-form generation and ad hoc JSON parsing for structured decisions.
+- Use an existing OpenAI-compatible API when only logprob access is needed.
+- Use SGLang for high-throughput local inference and shared-prefix reuse.
 
-Use this path on Windows, macOS, or Linux:
+Python 3.10 or newer is required.
+
+## Install
+
+The package is currently installed from source:
 
 ```bash
 git clone https://github.com/MercatorProj/MyJev.git
 cd MyJev
-uv sync
+python -m pip install -e .
+```
 
+Optional backend extras:
+
+```bash
+python -m pip install -e ".[transformers]"
+python -m pip install -e ".[sglang]"
+```
+
+`sglang` is intended for Linux with a supported NVIDIA GPU.
+
+## Model API quick start
+
+Set the endpoint and key:
+
+```bash
 export OPENAI_BASE_URL="https://your-openai-compatible-service/v1"
 export OPENAI_API_KEY="your-api-key"
+```
+
+PowerShell uses:
+
+```powershell
+$env:OPENAI_BASE_URL = "https://your-openai-compatible-service/v1"
+$env:OPENAI_API_KEY = "your-api-key"
+```
+
+Then run the bundled example:
+
+```bash
 python examples/openai_compatible_inference.py --model your-model-name
 ```
 
-On PowerShell, use `$env:OPENAI_BASE_URL` and `$env:OPENAI_API_KEY` instead of `export`.
-
-The API must return the top logprobs for the first generated token and include both `yes` and `no` in that window. `top_logprobs` can be increased up to 20; some providers tokenize or expose logprobs differently, so this backend is best treated as an approximation rather than a drop-in replacement for local logits.
-
-## Quick start with a local model
-
-On Linux with a supported NVIDIA GPU, run a local model through SGLang:
-
-```bash
-uv sync --extra sglang
-source .venv/bin/activate
-python examples/sglang_inference.py --model-path /path/to/model
-```
-
-Replace `/path/to/model` with a local Hugging Face-compatible causal language model directory. For a Transformers-only environment, use `uv sync --extra transformers` and `examples/transformers_inference.py`.
+The API must return first-token top logprobs containing both `yes` and `no`. Since providers expose tokenization and logprobs differently, the OpenAI-compatible backend is an approximation rather than an exact replacement for local logits.
 
 ## How it works
 
-MyJev converts each candidate into an independent yes/no judgment. Instead of asking the model to generate a JSON answer, a backend reads the next-token scores for `yes` and `no`. Code then normalizes the scores and assembles the response.
+```text
+JevRequest
+  -> compile candidates into yes/no prompts
+  -> backend reads next-token yes/no scores
+  -> normalize scores and assemble JevResponse
+```
 
-All candidates share `state`, and candidates for the same question share `instructions`. With SGLang, MyJev stages candidate submissions so shared prefixes are established once and reused through the Radix Cache.
+MyJev does not ask the model to generate a JSON object. Instead, each candidate becomes an independent binary judgment. The core then combines those probabilities according to the question type.
+
+With SGLang, candidate submissions are staged so shared `state` and `instructions` prefixes can be reused through the Radix Cache:
 
 ![Staged candidate scoring reuses state and question instructions through SGLang Radix Cache.](assets/shared-prefix-stages.svg)
 
-Learn more in [From Jev request to LLM request](docs/request-to-model.md) and [Shared-prefix design](docs/shared-prefix-cache.md).
+See [From Jev request to LLM request](docs/request-to-model.md) and [Shared-prefix design](docs/shared-prefix-cache.md) for the complete model.
 
-## Usage
+## Backends
 
-The [usage guide](docs/usage.md) covers:
+| Backend | Best for | Requirements | Shared-prefix staging |
+| --- | --- | --- | --- |
+| OpenAI-compatible API | Managed APIs and existing model services | First-token top logprobs | Not applicable |
+| SGLang | High-throughput local inference | Linux and a supported NVIDIA GPU | Yes |
+| Transformers | Local tests, research, CPU/CUDA fallback | `myjev[transformers]` | No |
 
-- OpenAI-compatible API backend
-- SGLang Python API
-- Transformers backend
-- System One HTTP API
-- Choosing between `staged` and `all`
+## Documentation
+
+| Guide | Description |
+| --- | --- |
+| [Installation](docs/installation.md) | Installation details and backend extras |
+| [Usage](docs/usage.md) | Python examples, HTTP service, and submission modes |
+| [Request to model](docs/request-to-model.md) | How Jev-style questions become model inputs |
+| [Shared-prefix cache](docs/shared-prefix-cache.md) | SGLang candidate staging and cache reuse |
+| [Benchmarks](docs/shared-prefix-benchmarks.md) | Shared-prefix staging results |
 
 ## Project structure
 
@@ -83,25 +113,18 @@ assets/          Diagrams and images
 
 ## Development
 
-Install the package in editable mode first so tests can import `myjev` from `src/`:
-
 ```bash
-pip install -e .
+python -m pip install -e .
 python -m unittest discover -s tests -v
 python -m compileall -q src tests
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for workflow details. Security issues should follow [SECURITY.md](SECURITY.md) and should not be opened as public issues.
+The tests do not require a model download. Contribution and security policies are documented in [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
-## Maintainers
+## Credits
 
-MyJev is maintained by [MercatorProj](https://github.com/MercatorProj). See [AUTHORS.md](AUTHORS.md) for contributor information.
-
-## Roadmap
-
-- More benchmarks across model sizes, datasets, and workloads.
-- An interactive web demo for submitting questions and inspecting probabilities.
-- Multimodal model and input support.
+- [LLM2Jev](https://github.com/Yinsongxu/LLM2Jev) inspired MyJev's prefill-only candidate scoring approach.
+- [Jev confidence documentation](https://docs.typesafe.ai/confidence) is referenced when describing this project's inferred probability assembly.
 
 ## License
 
