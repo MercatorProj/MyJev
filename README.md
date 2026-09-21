@@ -12,6 +12,14 @@ probabilities.
 The package is a thin orchestration layer around existing model APIs and
 inference runtimes. It does not train, fine-tune, host, or modify models.
 
+## Primitives
+
+| Primitive | Use it for | Answer |
+| --- | --- | --- |
+| `Choice` | Mutually exclusive options | The highest option, its confidence, and the full probability distribution |
+| `Score` | One ordered scale | A probability-weighted score, its confidence, and the level distribution |
+| `Noul` | An independent yes/no condition | The probability that the condition is true |
+
 ## Install
 
 Python 3.10 or newer is required.
@@ -56,6 +64,7 @@ approximate rather than an exact substitute for local logits.
 
 ```python
 from myjev import Choice, JevRequest, MyJev, Noul, OpenAICompatibleBackend
+from myjev import Score
 
 backend = OpenAICompatibleBackend(
     base_url="https://your-openai-compatible-service/v1",
@@ -72,6 +81,10 @@ request = JevRequest(
                 "billing": "Charges and billing",
                 "returns": "Returns and exchanges",
             },
+        ),
+        "severity": Score(
+            instructions="How severe is the issue?",
+            criteria=["Minor", "Disruptive", "Blocking"],
         ),
         "refund": Noul(instructions="Is the customer asking for a refund?"),
     },
@@ -90,10 +103,26 @@ An illustrative response is:
     "department": {
       "type": "choice",
       "choice": "billing",
-      "confidence": 0.50,
+      "confidence": 0.58,
       "probabilities": {
-        "billing": 0.75,
-        "returns": 0.25
+        "billing": 0.72,
+        "returns": 0.21,
+        "shipping": 0.07
+      }
+    },
+    "severity": {
+      "type": "score",
+      "score": 1.15,
+      "confidence": 0.48,
+      "legend": {
+        "0": "Minor",
+        "1": "Disruptive",
+        "2": "Blocking"
+      },
+      "probabilities": {
+        "0": 0.10,
+        "1": 0.65,
+        "2": 0.25
       }
     },
     "refund": {
@@ -102,7 +131,7 @@ An illustrative response is:
     }
   },
   "usage": {
-    "input_tokens": 38,
+    "input_tokens": 74,
     "output_tokens": 0
   }
 }

@@ -11,6 +11,14 @@ MyJev 是一个轻量级 Python 库，用于结构化决策评分。它接受运
 本项目只负责围绕现有模型 API 和推理后端编排请求，不训练、微调、托管或修改
 模型。
 
+## 元语
+
+| 元语 | 适用场景 | 返回内容 |
+| --- | --- | --- |
+| `Choice` | 一组互斥选项 | 最高概率选项、置信度和完整概率分布 |
+| `Score` | 一条有序量表 | 概率加权分数、置信度和档位分布 |
+| `Noul` | 一个独立的 yes/no 判断 | 条件成立的概率 |
+
 ## 安装
 
 需要 Python 3.10 或更新版本。
@@ -55,6 +63,7 @@ logits 的完全等价替代。
 
 ```python
 from myjev import Choice, JevRequest, MyJev, Noul, OpenAICompatibleBackend
+from myjev import Score
 
 backend = OpenAICompatibleBackend(
     base_url="https://your-openai-compatible-service/v1",
@@ -71,6 +80,10 @@ request = JevRequest(
                 "billing": "扣款和账单",
                 "returns": "退货和换货",
             },
+        ),
+        "severity": Score(
+            instructions="这个问题有多严重？",
+            criteria=["轻微", "影响使用", "无法使用"],
         ),
         "refund": Noul(instructions="客户是否要求退款？"),
     },
@@ -89,10 +102,26 @@ print(response.json)
     "department": {
       "type": "choice",
       "choice": "billing",
-      "confidence": 0.50,
+      "confidence": 0.58,
       "probabilities": {
-        "billing": 0.75,
-        "returns": 0.25
+        "billing": 0.72,
+        "returns": 0.21,
+        "shipping": 0.07
+      }
+    },
+    "severity": {
+      "type": "score",
+      "score": 1.15,
+      "confidence": 0.48,
+      "legend": {
+        "0": "轻微",
+        "1": "影响使用",
+        "2": "无法使用"
+      },
+      "probabilities": {
+        "0": 0.10,
+        "1": 0.65,
+        "2": 0.25
       }
     },
     "refund": {
@@ -101,7 +130,7 @@ print(response.json)
     }
   },
   "usage": {
-    "input_tokens": 38,
+    "input_tokens": 74,
     "output_tokens": 0
   }
 }
