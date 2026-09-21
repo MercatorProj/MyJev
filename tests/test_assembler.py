@@ -155,19 +155,21 @@ class AssembleResponseTests(unittest.TestCase):
                 normalizer=lambda _: (1.0,),
             )
 
-    def test_rejects_single_choice_candidate(self) -> None:
+    def test_accepts_single_choice_candidate(self) -> None:
         request = JevRequest(
             state="message",
             model="jev-latest",
             questions={"only": Choice(criteria={"one": None})},
         )
 
-        with self.assertRaises(ValueError):
-            assemble_response(
-                request=request,
-                tasks=compile_binary_questions(request),
-                yes_probabilities=[0.8],
-            )
+        response = assemble_response(
+            request=request,
+            tasks=compile_binary_questions(request),
+            yes_probabilities=[0.8],
+        )
+
+        self.assertEqual(response.answers["only"].choice, "one")  # type: ignore[union-attr]
+        self.assertEqual(response.answers["only"].confidence, 1.0)  # type: ignore[union-attr]
 
 
 if __name__ == "__main__":

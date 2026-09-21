@@ -17,11 +17,9 @@ export OPENAI_API_KEY="your-api-key"
 
 On PowerShell, use `$env:OPENAI_BASE_URL` and `$env:OPENAI_API_KEY`.
 
-Use the `request` shown in the SGLang example below.
-
 ```python
 import os
-from myjev import MyJev, OpenAICompatibleBackend
+from myjev import Choice, MyJev, Noul, OpenAICompatibleBackend, Score
 
 backend = OpenAICompatibleBackend(
     base_url=os.environ["OPENAI_BASE_URL"],
@@ -30,7 +28,25 @@ backend = OpenAICompatibleBackend(
     system_role="user",
     max_concurrency=2,
 )
-response = MyJev(backend=backend).evaluate(request)
+
+response = MyJev(backend=backend, model="your-model-name").system_one(
+    "My parcel arrived two weeks late, and my card was charged twice.",
+    questions={
+        "department": Choice(
+            instructions="Which department should handle this request?",
+            criteria={
+                "shipping": "Delivery problems",
+                "billing": "Charges and billing problems",
+                "returns": "Returns and exchanges",
+            },
+        ),
+        "severity": Score(
+            instructions="How severe is the problem?",
+            criteria=["Low", "Medium", "High"],
+        ),
+        "delivery": Noul(instructions="Is this a delivery issue?"),
+    },
+)
 print(response.to_dict())
 ```
 
@@ -46,37 +62,32 @@ python examples/openai_compatible_inference.py --model your-model-name --top-log
 
 ## SGLang Python API
 
-This example uses `Choice`, `Score`, and `Noul`. The local SGLang backend
-defaults to staged candidate submission:
+The local SGLang backend defaults to staged candidate submission:
 
 ```python
-from myjev import Choice, JevRequest, MyJev, Noul, Score, SGLangBackend
+from myjev import Choice, MyJev, Noul, Score, SGLangBackend
 
 if __name__ == "__main__":
     model_path = "/path/to/model"
-    request = JevRequest(
-        model=model_path,
-        state="My parcel arrived two weeks late, and my card was charged twice.",
-        questions={
-            "department": Choice(
-                instructions="Which department should handle this request?",
-                criteria={
-                    "shipping": "Delivery problems",
-                    "billing": "Charges and billing problems",
-                    "returns": "Returns and exchanges",
-                },
-            ),
-            "severity": Score(
-                instructions="How severe is the problem?",
-                criteria=["Low: minor impact", "Medium: impaired but usable", "High: unusable"],
-            ),
-            "delivery": Noul(
-                instructions="Is this a delivery issue?",
-            ),
-        },
-    )
+    state = "My parcel arrived two weeks late, and my card was charged twice."
+    questions = {
+        "department": Choice(
+            instructions="Which department should handle this request?",
+            criteria={
+                "shipping": "Delivery problems",
+                "billing": "Charges and billing problems",
+                "returns": "Returns and exchanges",
+            },
+        ),
+        "severity": Score(
+            instructions="How severe is the problem?",
+            criteria=["Low: minor impact", "Medium: impaired but usable", "High: unusable"],
+        ),
+        "delivery": Noul(instructions="Is this a delivery issue?"),
+    }
+
     with SGLangBackend(model_path, submission="staged") as backend:
-        response = MyJev(backend=backend).evaluate(request)
+        response = MyJev(backend=backend, model=model_path).system_one(state, questions)
         print(response.to_dict())
 ```
 
@@ -88,7 +99,7 @@ To submit all candidates together:
 
 ```python
 with SGLangBackend(model_path, submission="all") as backend:
-    response = MyJev(backend=backend).evaluate(request)
+    response = MyJev(backend=backend, model=model_path).system_one(state, questions)
 ```
 
 Run the bundled example with either mode:
@@ -110,16 +121,17 @@ python examples/transformers_inference.py --model-path /path/to/model
 from myjev import MyJev, TransformersBackend
 
 backend = TransformersBackend(model_path)
-response = MyJev(backend=backend).evaluate(request)
+response = MyJev(backend=backend, model=model_path).system_one(state, questions)
 print(response.to_dict())
 ```
 
 The backend uses CUDA when available and falls back to CPU otherwise.
 
-## MyJev HTTP API
+## HTTP API
 
-`myjev-serve` adds `POST /v1/myjev` to SGLang's HTTP server. Model listing,
-health checks, authentication, and SGLang's native endpoints remain unchanged.
+`myjev-serve` adds the official-style `POST /v1/systemone` endpoint to SGLang's
+HTTP server. Model listing, health checks, authentication, and SGLang's native
+endpoints remain unchanged.
 
 ```bash
 export MYJEV_API_KEY="replace-with-your-api-key"
@@ -138,10 +150,10 @@ curl http://localhost:30000/v1/models \
   -H "Authorization: Bearer $MYJEV_API_KEY"
 ```
 
-Submit a MyJev request:
+Submit a request:
 
 ```bash
-curl http://localhost:30000/v1/myjev \
+curl http://localhost:30000/v1/systemone \
   -H "Authorization: Bearer $MYJEV_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -156,9 +168,13 @@ curl http://localhost:30000/v1/myjev \
   }'
 ```
 
-Use `--submission staged|all` to select candidate submission for `/v1/myjev`.
-The default is `staged`; `staged` requires Radix Cache, while `all` can be used
-with `--disable-radix-cache`. The setting applies to the whole server process.
+The response contains `model`, `answers`, and `usage`. Typed question objects are
+validated locally. Raw dictionaries keep their fields unchanged, while local
+inference validates the three supported primitive types.
+
+Use `--submission staged|all` to select candidate submission. The default is
+`staged`; `staged` requires Radix Cache, while `all` can be used with
+`--disable-radix-cache`. The setting applies to the whole server process.
 
 The command also accepts SGLang's normal server arguments. It currently requires
 the default single-tokenizer HTTP mode and does not support

@@ -6,7 +6,6 @@ import argparse
 
 from myjev import (
     Choice,
-    JevRequest,
     MyJev,
     Noul,
     Score,
@@ -25,30 +24,29 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    request = JevRequest(
-        state="客户说包裹一直没有送到，希望查询物流并尽快处理。",
-        model=args.model_path,
-        questions={
-            "is_delivery_issue": Noul(
-                instructions="这是否是一个物流配送问题？",
-            ),
-            "department": Choice(
-                instructions="这个请求应该交给哪个部门处理？",
-                criteria={
-                    "billing": "付款、账单或退款问题",
-                    "shipping": "物流、配送或包裹丢失问题",
-                    "technical": "产品故障或技术支持问题",
-                },
-            ),
-            "urgency": Score(
-                instructions="评估这个客户请求的紧急程度。",
-                criteria=["不紧急", "比较紧急", "非常紧急"],
-            ),
-        },
-    )
+    questions = {
+        "is_delivery_issue": Noul(
+            instructions="这是否是一个物流配送问题？",
+        ),
+        "department": Choice(
+            instructions="这个请求应该交给哪个部门处理？",
+            criteria={
+                "billing": "付款、账单或退款问题",
+                "shipping": "物流、配送或包裹丢失问题",
+                "technical": "产品故障或技术支持问题",
+            },
+        ),
+        "urgency": Score(
+            instructions="评估这个客户请求的紧急程度。",
+            criteria=["不紧急", "比较紧急", "非常紧急"],
+        ),
+    }
 
     backend = TransformersBackend(args.model_path)
-    response = MyJev(backend=backend).evaluate(request)
+    response = MyJev(backend=backend, model=args.model_path).system_one(
+        state="客户说包裹一直没有送到，希望查询物流并尽快处理。",
+        questions=questions,
+    )
     print(response.json)
 
 

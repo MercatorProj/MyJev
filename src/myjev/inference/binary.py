@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-from ..core.questions import Choice, Noul, Score
+from ..core.questions import Choice, Noul, Score, parse_question
 from ..core.request import JevRequest
 from ..core.types import JSONContent, State
 from ..utils.json import copy_json_content, is_json_content
@@ -63,34 +63,35 @@ def compile_binary_questions(request: JevRequest) -> tuple[BinaryQuestion, ...]:
 
     tasks: list[BinaryQuestion] = []
     for question_id, question in request.questions.items():
-        if isinstance(question, Choice):
-            if not question.criteria:
+        typed_question = question if isinstance(question, (Choice, Score, Noul)) else parse_question(question)
+        if isinstance(typed_question, Choice):
+            if not typed_question.criteria:
                 raise ValueError(f"choice question {question_id!r} must contain criteria")
-            for option, description in question.criteria.items():
+            for option, description in typed_question.criteria.items():
                 tasks.append(
                     BinaryQuestion(
                         question_id=question_id,
                         question_type="choice",
                         candidate=option,
                         context=request.state,
-                        objective=question.instructions,
+                        objective=typed_question.instructions,
                         condition=description,
                     )
                 )
-        elif isinstance(question, Score):
-            for level, description in enumerate(question.criteria):
+        elif isinstance(typed_question, Score):
+            for level, description in enumerate(typed_question.criteria):
                 tasks.append(
                     BinaryQuestion(
                         question_id=question_id,
                         question_type="score",
                         candidate=level,
                         context=request.state,
-                        objective=question.instructions,
+                        objective=typed_question.instructions,
                         condition=description,
                     )
                 )
-        elif isinstance(question, Noul):
-            criteria = question.criteria or {}
+        elif isinstance(typed_question, Noul):
+            criteria = typed_question.criteria or {}
             candidates = ("true", "false") if criteria else ("true",)
             for candidate in candidates:
                 tasks.append(
@@ -99,7 +100,7 @@ def compile_binary_questions(request: JevRequest) -> tuple[BinaryQuestion, ...]:
                         question_type="noul",
                         candidate=candidate,
                         context=request.state,
-                        objective=question.instructions,
+                        objective=typed_question.instructions,
                         condition=criteria.get(candidate),
                     )
                 )

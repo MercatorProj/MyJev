@@ -47,11 +47,14 @@ class ScoreTests(unittest.TestCase):
             },
         )
 
-    def test_requires_between_two_and_ten_levels(self) -> None:
+    def test_requires_at_least_one_level(self) -> None:
         with self.assertRaises(ValueError):
-            Score(instructions="Rate this.", criteria=["Only"])
-        with self.assertRaises(ValueError):
-            Score(instructions="Rate this.", criteria=[str(index) for index in range(11)])
+            Score(instructions="Rate this.", criteria=[])
+
+    def test_accepts_one_level(self) -> None:
+        question = Score(instructions="Rate this.", criteria=["Only"])
+
+        self.assertEqual(question.criteria, ("Only",))
 
     def test_accepts_structured_levels_and_instructions(self) -> None:
         question = Score(

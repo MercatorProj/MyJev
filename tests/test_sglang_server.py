@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call, patch
 
 from myjev import Choice, JevRequest, Noul, Score
+from myjev.inference.binary import compile_binary_questions
 from myjev.sglang_server import (
     _evaluate_request,
     _parse_request,
@@ -38,30 +39,42 @@ class EvaluationRequestParsingTests(unittest.TestCase):
             },
         })
 
-        self.assertIsInstance(request.questions["department"], Choice)
-        self.assertIsInstance(request.questions["urgency"], Score)
-        self.assertIsInstance(request.questions["delivery"], Noul)
+        self.assertIsInstance(request.questions["department"], dict)
+        self.assertIsInstance(request.questions["urgency"], dict)
+        self.assertIsInstance(request.questions["delivery"], dict)
         self.assertEqual(request.model, "local-model")
 
-    def test_rejects_missing_and_malformed_fields(self) -> None:
+    def test_rejects_missing_fields_before_evaluation(self) -> None:
         invalid = (
             [],
             {"model": "model", "questions": {"check": {"type": "noul"}}},
             {"state": "text", "model": "model", "questions": []},
-            {
-                "state": "text",
-                "model": "model",
-                "questions": {"check": {"type": "unknown"}},
-            },
-            {
-                "state": "text",
-                "model": "model",
-                "questions": {"check": {"type": "choice", "criteria": []}},
-            },
         )
         for payload in invalid:
             with self.subTest(payload=payload), self.assertRaises((TypeError, ValueError)):
                 _parse_request(payload)
+
+    def test_accepts_raw_questions_and_preserves_unknown_fields(self) -> None:
+        raw = {"type": "noul", "instructions": "Is this true?", "future": 3}
+
+        request = _parse_request({
+            "state": "text",
+            "model": "model",
+            "questions": {"check": raw},
+        })
+
+        self.assertIs(request.questions["check"], raw)
+        self.assertEqual(request.to_dict()["questions"]["check"], raw)  # type: ignore[index]
+
+    def test_rejects_unsupported_raw_questions_during_evaluation(self) -> None:
+        payloads = (
+            {"state": "text", "model": "model", "questions": {"check": {"type": "unknown"}}},
+            {"state": "text", "model": "model", "questions": {"check": {"type": "choice", "criteria": []}}},
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload), self.assertRaises((TypeError, ValueError)):
+                request = _parse_request(payload)
+                compile_binary_questions(request)
 
 
 class EvaluationTests(unittest.IsolatedAsyncioTestCase):

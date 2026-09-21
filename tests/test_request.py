@@ -92,8 +92,48 @@ class JevRequestTests(unittest.TestCase):
             JevRequest(
                 state="message",
                 model="jev-latest",
-                questions={"check": {"type": "noul"}},  # type: ignore[dict-item]
+                questions={"check": "noul"},  # type: ignore[dict-item]
             )
+
+    def test_accepts_raw_question_dictionaries(self) -> None:
+        request = JevRequest(
+            state="message",
+            model="jev-latest",
+            questions={"check": {"type": "noul", "instructions": "Is this true?"}},
+        )
+
+        self.assertEqual(
+            request.to_dict(),
+            {
+                "state": "message",
+                "model": "jev-latest",
+                "questions": {
+                    "check": {"type": "noul", "instructions": "Is this true?"},
+                },
+            },
+        )
+
+    def test_preserves_raw_question_fields(self) -> None:
+        raw = {"type": "choice", "instructions": "Tone?", "criteria": {"calm": None}, "weight": 3}
+
+        request = JevRequest(state="message", model="jev-latest", questions={"check": raw})
+
+        self.assertIs(request.questions["check"], raw)
+        self.assertEqual(request.to_dict()["questions"]["check"], raw)  # type: ignore[index]
+
+    def test_rejects_raw_questions_without_required_structure(self) -> None:
+        invalid = (
+            {},
+            {"instructions": "Missing type"},
+            {"type": ""},
+            {"type": 1},
+            {"type": "choice"},
+            {"type": "score"},
+            {"type": "score", "criteria": []},
+        )
+        for question in invalid:
+            with self.subTest(question=question), self.assertRaises(ValueError):
+                JevRequest(state="message", model="jev-latest", questions={"check": question})  # type: ignore[dict-item]
 
 
 if __name__ == "__main__":

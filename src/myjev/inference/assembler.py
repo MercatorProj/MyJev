@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from typing import TypeAlias
 
 from ..core.answers import Answer, ChoiceAnswer, NoulAnswer, ScoreAnswer
-from ..core.questions import Choice, Noul, Score
+from ..core.questions import Choice, Noul, Score, parse_question
 from ..core.request import JevRequest
 from ..core.response import JevResponse, Usage
 from ..utils.probability import validate_probabilities
@@ -30,8 +30,10 @@ def _normalize(
 
 def _confidence(probabilities: Sequence[float]) -> float:
     count = len(probabilities)
-    if count < 2:
-        raise ValueError("confidence requires at least two candidates")
+    if count == 0:
+        raise ValueError("confidence requires at least one candidate")
+    if count == 1:
+        return 1.0
     confidence = (count * max(probabilities) - 1) / (count - 1)
     return min(1.0, max(0.0, confidence))
 
@@ -63,15 +65,14 @@ def assemble_response(
 
     answers: dict[str, Answer] = {}
     for question_id, question in request.questions.items():
+        typed_question = question if isinstance(question, (Choice, Score, Noul)) else parse_question(question)
         task_probabilities = grouped[question_id]
         candidates = [task.candidate for task, _ in task_probabilities]
         raw = [probability for _, probability in task_probabilities]
 
-        if isinstance(question, Choice):
-            if len(candidates) < 2:
-                raise ValueError("choice answers require at least two candidates")
+        if isinstance(typed_question, Choice):
             probabilities = _normalize(raw, normalizer)
-            labels = list(question.criteria)
+            labels = list(typed_question.criteria)
             by_label = dict(zip(labels, probabilities))
             choice = max(labels, key=by_label.__getitem__)
             answers[question_id] = ChoiceAnswer(
@@ -79,18 +80,18 @@ def assemble_response(
                 confidence=_confidence(probabilities),
                 probabilities=by_label,
             )
-        elif isinstance(question, Score):
+        elif isinstance(typed_question, Score):
             probabilities = _normalize(raw, normalizer)
             by_level = dict(enumerate(probabilities))
             score = math.fsum(level * probability for level, probability in by_level.items())
             answers[question_id] = ScoreAnswer(
                 score=score,
                 confidence=_confidence(probabilities),
-                legend=dict(enumerate(question.criteria)),
+                legend=dict(enumerate(typed_question.criteria)),
                 probabilities=by_level,
             )
-        elif isinstance(question, Noul):
-            if question.criteria:
+        elif isinstance(typed_question, Noul):
+            if typed_question.criteria:
                 probabilities = _normalize(raw, normalizer)
                 by_candidate = dict(zip(candidates, probabilities))
                 answers[question_id] = NoulAnswer(noul=by_candidate["true"])

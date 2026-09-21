@@ -7,7 +7,6 @@ import os
 
 from myjev import (
     Choice,
-    JevRequest,
     MyJev,
     Noul,
     OpenAICompatibleBackend,
@@ -30,9 +29,14 @@ def main() -> None:
     parser.add_argument("--max-concurrency", type=int, default=1)
     args = parser.parse_args()
 
-    request = JevRequest(
+    backend = OpenAICompatibleBackend(
+        base_url=args.base_url,
+        top_logprobs=args.top_logprobs,
+        system_role=args.system_role,
+        max_concurrency=args.max_concurrency,
+    )
+    response = MyJev(backend=backend, model=args.model).system_one(
         state="客户说包裹一直没有送到，希望查询物流并尽快处理。",
-        model=args.model,
         questions={
             "is_delivery_issue": Noul(
                 instructions="这是否是一个物流配送问题？",
@@ -51,14 +55,6 @@ def main() -> None:
             ),
         },
     )
-
-    backend = OpenAICompatibleBackend(
-        base_url=args.base_url,
-        top_logprobs=args.top_logprobs,
-        system_role=args.system_role,
-        max_concurrency=args.max_concurrency,
-    )
-    response = MyJev(backend=backend).evaluate(request)
     print(response.json)
 
 

@@ -5,11 +5,9 @@ from dataclasses import dataclass
 from typing import TypeAlias
 
 from .questions import Choice, Noul, Score
+from .questions import DEFAULT_MODEL, QuestionInput, validate_question_input
 from ..utils.json import is_json_content
 from .types import State
-
-
-Question: TypeAlias = Choice | Score | Noul
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -17,8 +15,8 @@ class JevRequest:
     """A collection of questions about shared state for a specific model."""
 
     state: State
-    model: str
-    questions: Mapping[str, Question]
+    model: str = DEFAULT_MODEL
+    questions: Mapping[str, QuestionInput]
 
     def __post_init__(self) -> None:
         if not is_json_content(self.state):
@@ -27,12 +25,12 @@ class JevRequest:
             raise ValueError("model must be a non-empty string")
 
         questions = dict(self.questions)
+        for question in questions.values():
+            validate_question_input(question)
         if not questions:
             raise ValueError("questions must contain at least one question")
         if any(not isinstance(question_id, str) or not question_id for question_id in questions):
             raise ValueError("question IDs must be non-empty strings")
-        if any(not isinstance(question, (Choice, Score, Noul)) for question in questions.values()):
-            raise ValueError("questions must contain Choice, Score, or Noul instances")
         object.__setattr__(self, "questions", questions)
 
     def to_dict(self) -> dict[str, object]:
@@ -40,7 +38,7 @@ class JevRequest:
             "state": self.state,
             "model": self.model,
             "questions": {
-                question_id: question.to_dict()
+                question_id: question.to_dict() if isinstance(question, (Choice, Score, Noul)) else question
                 for question_id, question in self.questions.items()
             },
         }

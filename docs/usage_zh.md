@@ -16,11 +16,9 @@ export OPENAI_API_KEY="your-api-key"
 
 PowerShell 使用 `$env:OPENAI_BASE_URL` 和 `$env:OPENAI_API_KEY`。
 
-下面的 `request` 使用 SGLang 示例中的完整请求。
-
 ```python
 import os
-from myjev import MyJev, OpenAICompatibleBackend
+from myjev import Choice, MyJev, Noul, OpenAICompatibleBackend, Score
 
 backend = OpenAICompatibleBackend(
     base_url=os.environ["OPENAI_BASE_URL"],
@@ -29,7 +27,25 @@ backend = OpenAICompatibleBackend(
     system_role="user",
     max_concurrency=2,
 )
-response = MyJev(backend=backend).evaluate(request)
+
+response = MyJev(backend=backend, model="your-model-name").system_one(
+    "包裹晚到了两周，信用卡还被扣了两次。",
+    questions={
+        "department": Choice(
+            instructions="哪个部门应该处理这个请求？",
+            criteria={
+                "shipping": "物流配送问题",
+                "billing": "扣款和账单问题",
+                "returns": "退货和换货问题",
+            },
+        ),
+        "severity": Score(
+            instructions="这个问题有多严重？",
+            criteria=["低", "中", "高"],
+        ),
+        "delivery": Noul(instructions="这是物流配送问题吗？"),
+    },
+)
 print(response.to_dict())
 ```
 
@@ -44,37 +60,32 @@ python examples/openai_compatible_inference.py --model your-model-name --top-log
 
 ## SGLang Python API
 
-下面的示例同时使用 `Choice`、`Score` 和 `Noul`。本地 SGLang 后端默认使用分阶段
-提交：
+本地 SGLang 后端默认使用分阶段提交：
 
 ```python
-from myjev import Choice, JevRequest, MyJev, Noul, Score, SGLangBackend
+from myjev import Choice, MyJev, Noul, Score, SGLangBackend
 
 if __name__ == "__main__":
     model_path = "/path/to/model"
-    request = JevRequest(
-        model=model_path,
-        state="包裹晚到了两周，信用卡还被扣了两次。",
-        questions={
-            "department": Choice(
-                instructions="哪个部门应该处理这个请求？",
-                criteria={
-                    "shipping": "物流配送问题",
-                    "billing": "扣款和账单问题",
-                    "returns": "退货和换货问题",
-                },
-            ),
-            "severity": Score(
-                instructions="这个问题有多严重？",
-                criteria=["低：影响轻微", "中：存在问题但仍可继续使用", "高：无法继续使用"],
-            ),
-            "delivery": Noul(
-                instructions="这是物流配送问题吗？",
-            ),
-        },
-    )
+    state = "包裹晚到了两周，信用卡还被扣了两次。"
+    questions = {
+        "department": Choice(
+            instructions="哪个部门应该处理这个请求？",
+            criteria={
+                "shipping": "物流配送问题",
+                "billing": "扣款和账单问题",
+                "returns": "退货和换货问题",
+            },
+        ),
+        "severity": Score(
+            instructions="这个问题有多严重？",
+            criteria=["低：影响轻微", "中：存在问题但仍可继续使用", "高：无法继续使用"],
+        ),
+        "delivery": Noul(instructions="这是物流配送问题吗？"),
+    }
+
     with SGLangBackend(model_path, submission="staged") as backend:
-        response = MyJev(backend=backend).evaluate(request)
+        response = MyJev(backend=backend, model=model_path).system_one(state, questions)
         print(response.to_dict())
 ```
 
@@ -86,7 +97,7 @@ SGLang 会创建工作进程，因此脚本入口需要 `if __name__ == "__main_
 
 ```python
 with SGLangBackend(model_path, submission="all") as backend:
-    response = MyJev(backend=backend).evaluate(request)
+    response = MyJev(backend=backend, model=model_path).system_one(state, questions)
 ```
 
 仓库示例支持两种模式：
@@ -108,16 +119,16 @@ python examples/transformers_inference.py --model-path /path/to/model
 from myjev import MyJev, TransformersBackend
 
 backend = TransformersBackend(model_path)
-response = MyJev(backend=backend).evaluate(request)
+response = MyJev(backend=backend, model=model_path).system_one(state, questions)
 print(response.to_dict())
 ```
 
 该后端优先使用 CUDA；没有可用 GPU 时回退到 CPU。
 
-## MyJev HTTP API
+## HTTP API
 
-`myjev-serve` 在 SGLang HTTP 服务上增加 `POST /v1/myjev`。模型列表、健康检查、
-鉴权和 SGLang 原生接口保持不变。
+`myjev-serve` 在 SGLang HTTP 服务上增加官方风格的 `POST /v1/systemone`。模型
+列表、健康检查、鉴权和 SGLang 原生接口保持不变。
 
 ```bash
 export MYJEV_API_KEY="replace-with-your-api-key"
@@ -136,10 +147,10 @@ curl http://localhost:30000/v1/models \
   -H "Authorization: Bearer $MYJEV_API_KEY"
 ```
 
-提交 MyJev 请求：
+提交请求：
 
 ```bash
-curl http://localhost:30000/v1/myjev \
+curl http://localhost:30000/v1/systemone \
   -H "Authorization: Bearer $MYJEV_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -154,9 +165,12 @@ curl http://localhost:30000/v1/myjev \
   }'
 ```
 
-通过 `--submission staged|all` 选择 `/v1/myjev` 的候选提交方式，默认 `staged`。
-`staged` 依赖 Radix Cache；`all` 可以配合 `--disable-radix-cache` 使用。该设置对
-整个服务进程生效。
+响应包含 `model`、`answers` 和 `usage`。typed 问题对象会在本地校验；raw 字典
+保留原始字段，本地推理会校验三种受支持的元语。
+
+通过 `--submission staged|all` 选择候选提交方式，默认 `staged`。`staged` 依赖
+Radix Cache；`all` 可以配合 `--disable-radix-cache` 使用。该设置对整个服务进程
+生效。
 
 服务也复用 SGLang 的启动参数，目前要求默认的单 tokenizer HTTP 模式，且不能启用
 `--skip-tokenizer-init`。

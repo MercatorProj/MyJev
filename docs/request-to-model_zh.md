@@ -12,8 +12,8 @@ MyJev 把一个结构化决策拆成多个二元判断。每个候选都会得�
 
 ```json
 {
-  "model": "your-model",
   "state": "信用卡重复扣款，请退回多扣的钱。",
+  "model": "your-model",
   "questions": {
     "department": {
       "type": "choice",
@@ -96,7 +96,11 @@ MyJev 随后按问题分组这些分数：
 数量为 `n`，最大候选概率为 `p_max`，MyJev 计算：
 
 ```text
+当 n = 1 时，confidence = 1；当 n > 1 时：
+
+```text
 confidence = (n * p_max - 1) / (n - 1)
+```
 ```
 
 结果限制在 `[0, 1]`。均匀分布的 confidence 是 0；概率全部集中在一个候选时

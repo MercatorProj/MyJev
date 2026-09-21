@@ -132,6 +132,49 @@ class MyJevTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "backend failed"):
             MyJev(backend=FailingBackend()).evaluate(request)
 
+    def test_system_one_uses_configured_or_overridden_model(self) -> None:
+        questions = {
+            "department": Choice(criteria={"billing": None, "returns": None}),
+            "severity": Score(criteria=["Low", "High"]),
+            "refund": Noul(instructions="Is a refund requested?"),
+        }
+        backend = FakeBackend([0.8, 0.2, 0.3, 0.7, 0.9])
+        engine = MyJev(backend=backend, model="configured-model")
+
+        response = engine.system_one(
+            "A duplicate charge was reported.",
+            questions,
+        )
+
+        self.assertEqual(response.model, "configured-model")
+        self.assertEqual(backend.calls[0][0], "configured-model")
+        self.assertEqual(response.choices["department"].choice, "billing")
+        self.assertEqual(response.scores["severity"].score, 0.7)
+        self.assertEqual(response.nouls["refund"].noul, 0.9)
+
+        response = engine.system_one(
+            "A duplicate charge was reported.",
+            questions,
+            model="override-model",
+        )
+
+        self.assertEqual(response.model, "override-model")
+        self.assertEqual(backend.calls[1][0], "override-model")
+
+    def test_system_one_compiles_raw_question_dictionaries(self) -> None:
+        questions = {
+            "department": {"type": "choice", "criteria": {"billing": None, "returns": None}, "weight": 2},
+            "severity": {"type": "score", "criteria": ["Low", "High"], "future": True},
+            "refund": {"type": "noul", "instructions": "Is a refund requested?"},
+        }
+        backend = FakeBackend([0.8, 0.2, 0.3, 0.7, 0.9])
+
+        response = MyJev(backend=backend).system_one("message", questions)
+
+        self.assertEqual(response.choices["department"].choice, "billing")
+        self.assertEqual(response.scores["severity"].score, 0.7)
+        self.assertEqual(response.nouls["refund"].noul, 0.9)
+
 
 class BinaryBackendOutputTests(unittest.TestCase):
     def test_copies_and_validates_probabilities(self) -> None:

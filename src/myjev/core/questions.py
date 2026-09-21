@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, TypeAlias
+
+DEFAULT_MODEL = "jev-latest"
 
 from ..utils.json import is_json_content
 from .types import JSONContent
@@ -34,10 +36,11 @@ class Choice:
     def to_dict(self) -> dict[str, object]:
         result: dict[str, object] = {
             "type": self.type,
+            "instructions": self.instructions,
             "criteria": dict(self.criteria),
         }
-        if self.instructions is not None:
-            result["instructions"] = self.instructions
+        if self.instructions is None:
+            del result["instructions"]
         return result
 
 
@@ -55,8 +58,8 @@ class Score:
         if isinstance(self.criteria, (str, bytes)):
             raise ValueError("score criteria must be a sequence of level descriptions")
         criteria = tuple(self.criteria)
-        if not 2 <= len(criteria) <= 10:
-            raise ValueError("score criteria must contain between 2 and 10 levels")
+        if not criteria:
+            raise ValueError("score criteria must contain at least one level")
         if any(not is_json_content(description) for description in criteria):
             raise ValueError("score level descriptions must be JSON content")
         object.__setattr__(self, "criteria", criteria)
@@ -64,10 +67,11 @@ class Score:
     def to_dict(self) -> dict[str, object]:
         result: dict[str, object] = {
             "type": self.type,
+            "instructions": self.instructions,
             "criteria": list(self.criteria),
         }
-        if self.instructions is not None:
-            result["instructions"] = self.instructions
+        if self.instructions is None:
+            del result["instructions"]
         return result
 
 
@@ -98,3 +102,58 @@ class Noul:
         if self.criteria is not None:
             result["criteria"] = dict(self.criteria)
         return result
+
+
+Question: TypeAlias = Choice | Score | Noul | Mapping[str, object]
+QuestionInput: TypeAlias = Question
+Questions: TypeAlias = Mapping[str, QuestionInput]
+
+
+def validate_question_input(value: object) -> object:
+    """Validate question shape without converting or copying raw dictionaries."""
+
+    if isinstance(value, (Choice, Score, Noul)):
+        return value
+    if not isinstance(value, dict) or not isinstance(value.get("type"), str) or not value["type"]:
+        raise ValueError("each question must be a question object or a dict with a nonempty string type")
+    if value["type"] in ("choice", "score") and "criteria" not in value:
+        raise ValueError(f'{value["type"]} questions require criteria')
+    if value["type"] == "score" and not value["criteria"]:
+        raise ValueError("score questions require at least one criterion")
+    return value
+
+
+def parse_question(value: object) -> Question:
+    """Parse a JSON-shaped question while preserving typed question objects."""
+
+    if isinstance(value, (Choice, Score, Noul)):
+        return value
+    if not isinstance(value, Mapping):
+        raise ValueError("each question must be a JSON object")
+
+    question_type = value.get("type")
+    instructions = value.get("instructions")
+    if question_type == "choice":
+        criteria = value.get("criteria")
+        if not isinstance(criteria, Mapping):
+            raise ValueError("choice criteria must be a JSON object")
+        return Choice(
+            instructions=instructions,  # type: ignore[arg-type]
+            criteria=criteria,  # type: ignore[arg-type]
+        )
+    if question_type == "score":
+        if "criteria" not in value:
+            raise ValueError("score criteria is required")
+        return Score(
+            instructions=instructions,  # type: ignore[arg-type]
+            criteria=value["criteria"],  # type: ignore[arg-type]
+        )
+    if question_type == "noul":
+        criteria = value.get("criteria")
+        if criteria is not None and not isinstance(criteria, Mapping):
+            raise ValueError("noul criteria must be a JSON object")
+        return Noul(
+            instructions=instructions,  # type: ignore[arg-type]
+            criteria=criteria,  # type: ignore[arg-type]
+        )
+    raise ValueError("question type must be choice, score, or noul")

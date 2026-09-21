@@ -9,7 +9,7 @@
 复用完全相同输入前缀的 KV 结果，避免重复计算。对长上下文、多候选请求来说，
 即使没有任何历史请求命中缓存，也可能获得收益。
 
-本地 Python `SGLangBackend` 和 `myjev-serve` 提供的 `/v1/myjev` 接口默认使用
+本地 Python `SGLangBackend` 和 `myjev-serve` 提供的 `/v1/systemone` 接口默认使用
 分阶段提交；`TransformersBackend` 目前不支持这种提交策略。
 
 ## 为什么输入会重复计算？

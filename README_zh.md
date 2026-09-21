@@ -62,16 +62,14 @@ logits 的完全等价替代。
 ## 示例
 
 ```python
-from myjev import Choice, JevRequest, MyJev, Noul, OpenAICompatibleBackend
-from myjev import Score
+from myjev import Choice, MyJev, Noul, OpenAICompatibleBackend, Score
 
 backend = OpenAICompatibleBackend(
     base_url="https://your-openai-compatible-service/v1",
     api_key="your-api-key",
     top_logprobs=20,
 )
-request = JevRequest(
-    model="your-model-name",
+response = MyJev(backend=backend, model="your-model-name").system_one(
     state="客户说信用卡被重复扣款，并要求退款。",
     questions={
         "department": Choice(
@@ -88,8 +86,6 @@ request = JevRequest(
         "refund": Noul(instructions="客户是否要求退款？"),
     },
 )
-
-response = MyJev(backend=backend).evaluate(request)
 print(response.json)
 ```
 
@@ -105,8 +101,7 @@ print(response.json)
       "confidence": 0.58,
       "probabilities": {
         "billing": 0.72,
-        "returns": 0.21,
-        "shipping": 0.07
+        "returns": 0.28
       }
     },
     "severity": {
@@ -161,7 +156,7 @@ logprobs；SGLang 和 Transformers 可以直接从本地模型的 logits 评分�
 | SGLang | 高吞吐本地推理 | Linux，受支持的 NVIDIA GPU | 支持 |
 | Transformers | 本地测试和研究 | `myjev[transformers]` | 不支持 |
 
-可选的 `myjev-serve` 命令会在 SGLang HTTP 服务上增加 `POST /v1/myjev`。
+可选的 `myjev-serve` 命令会在 SGLang HTTP 服务上增加 `POST /v1/systemone`。
 
 ## 文档
 

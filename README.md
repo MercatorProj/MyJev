@@ -63,16 +63,14 @@ approximate rather than an exact substitute for local logits.
 ## Example
 
 ```python
-from myjev import Choice, JevRequest, MyJev, Noul, OpenAICompatibleBackend
-from myjev import Score
+from myjev import Choice, MyJev, Noul, OpenAICompatibleBackend, Score
 
 backend = OpenAICompatibleBackend(
     base_url="https://your-openai-compatible-service/v1",
     api_key="your-api-key",
     top_logprobs=20,
 )
-request = JevRequest(
-    model="your-model-name",
+response = MyJev(backend=backend, model="your-model-name").system_one(
     state="The customer says a card was charged twice and asks for a refund.",
     questions={
         "department": Choice(
@@ -89,8 +87,6 @@ request = JevRequest(
         "refund": Noul(instructions="Is the customer asking for a refund?"),
     },
 )
-
-response = MyJev(backend=backend).evaluate(request)
 print(response.json)
 ```
 
@@ -106,8 +102,7 @@ An illustrative response is:
       "confidence": 0.58,
       "probabilities": {
         "billing": 0.72,
-        "returns": 0.21,
-        "shipping": 0.07
+        "returns": 0.28
       }
     },
     "severity": {
@@ -163,7 +158,7 @@ With SGLang, MyJev can stage candidate submissions so shared `state` and
 | SGLang | High-throughput local inference | Linux, supported NVIDIA GPU | Yes |
 | Transformers | Local tests and research | `myjev[transformers]` | No |
 
-The optional `myjev-serve` command adds `POST /v1/myjev` to an SGLang HTTP
+The optional `myjev-serve` command adds `POST /v1/systemone` to an SGLang HTTP
 server.
 
 ## Documentation

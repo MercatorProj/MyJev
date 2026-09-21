@@ -10,7 +10,7 @@ that produces several candidate judgments. It reuses KV results for identical
 input prefixes instead of recomputing them. Long inputs with many candidates can
 benefit even when no earlier request has populated the cache.
 
-The Python `SGLangBackend` and the `/v1/myjev` endpoint served by `myjev-serve`
+The Python `SGLangBackend` and the `/v1/systemone` endpoint served by `myjev-serve`
 default to staged submission. `TransformersBackend` does not currently use this
 strategy.
 

@@ -12,44 +12,11 @@ from .backend.sglang_backend import (
     _yes_probabilities,
 )
 from .backend.tokenization import _single_token_id
-from .core.questions import Choice, Noul, Score
-from .core.request import JevRequest, Question
+from .core.request import JevRequest
 from .core.response import JevResponse, Usage
 from .inference.assembler import assemble_response
 from .inference.binary import compile_binary_questions
 from .inference.prompt import DefaultPromptRenderer
-
-
-def _parse_question(value: object) -> Question:
-    if not isinstance(value, Mapping):
-        raise ValueError("each question must be a JSON object")
-
-    question_type = value.get("type")
-    instructions = value.get("instructions")
-    if question_type == "choice":
-        criteria = value.get("criteria")
-        if not isinstance(criteria, Mapping):
-            raise ValueError("choice criteria must be a JSON object")
-        return Choice(  # type: ignore[arg-type]
-            instructions=instructions,
-            criteria=criteria,
-        )
-    if question_type == "score":
-        if "criteria" not in value:
-            raise ValueError("score criteria is required")
-        return Score(  # type: ignore[arg-type]
-            instructions=instructions,
-            criteria=value["criteria"],
-        )
-    if question_type == "noul":
-        criteria = value.get("criteria")
-        if criteria is not None and not isinstance(criteria, Mapping):
-            raise ValueError("noul criteria must be a JSON object")
-        return Noul(  # type: ignore[arg-type]
-            instructions=instructions,
-            criteria=criteria,
-        )
-    raise ValueError("question type must be choice, score, or noul")
 
 
 def _parse_request(payload: object) -> JevRequest:
@@ -65,10 +32,7 @@ def _parse_request(payload: object) -> JevRequest:
     return JevRequest(
         state=payload["state"],  # type: ignore[arg-type]
         model=payload["model"],  # type: ignore[arg-type]
-        questions={
-            question_id: _parse_question(question)
-            for question_id, question in questions.items()
-        },
+        questions=dict(questions),
     )
 
 
@@ -132,12 +96,13 @@ def register_evaluation_route(*, submission: str = "staged") -> Any:
         ) from error
 
     app.state.myjev_submission = submission
-    if any(getattr(route, "path", None) == "/v1/myjev" for route in app.routes):
+    if any(getattr(route, "path", None) == "/v1/systemone" for route in app.routes):
         return app
 
     async def evaluate(payload: dict[str, object]) -> dict[str, object]:
         try:
             request = _parse_request(payload)
+            compile_binary_questions(request)
         except (TypeError, ValueError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -152,7 +117,7 @@ def register_evaluation_route(*, submission: str = "staged") -> Any:
         )
         return response.to_dict()
 
-    app.add_api_route("/v1/myjev", evaluate, methods=["POST"])
+    app.add_api_route("/v1/systemone", evaluate, methods=["POST"])
     return app
 
 
@@ -173,7 +138,7 @@ def _parse_submission_args(argv: list[str]) -> tuple[str, list[str]]:
         "--submission",
         choices=("staged", "all"),
         default="staged",
-        help="Candidate submission for /v1/myjev (default: staged).",
+        help="Candidate submission for /v1/systemone (default: staged).",
     )
     args, remaining = parser.parse_known_args(argv)
     if "--help" in remaining or "-h" in remaining:

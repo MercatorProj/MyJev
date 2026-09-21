@@ -13,8 +13,8 @@ A MyJev request has three parts:
 
 ```json
 {
-  "model": "your-model",
   "state": "My card was charged twice. Please refund the extra charge.",
+  "model": "your-model",
   "questions": {
     "department": {
       "type": "choice",
@@ -102,7 +102,8 @@ distribution is. With `n` candidates and maximum probability `p_max`, MyJev
 computes:
 
 ```text
-confidence = (n * p_max - 1) / (n - 1)
+confidence = 1, when n = 1
+confidence = (n * p_max - 1) / (n - 1), when n > 1
 ```
 
 The value is clamped to `[0, 1]`. A uniform distribution gives confidence 0; all
