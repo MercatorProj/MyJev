@@ -11,11 +11,11 @@ from myjev.sglang_server import (
     _parse_submission_args,
     _validate_server_args,
     main,
-    register_systemone_route,
+    register_evaluation_route,
 )
 
 
-class SystemOneRequestParsingTests(unittest.TestCase):
+class EvaluationRequestParsingTests(unittest.TestCase):
     def test_parses_all_question_types(self) -> None:
         request = _parse_request({
             "state": {"message": "Package delayed"},
@@ -64,7 +64,7 @@ class SystemOneRequestParsingTests(unittest.TestCase):
                 _parse_request(payload)
 
 
-class SystemOneEvaluationTests(unittest.IsolatedAsyncioTestCase):
+class EvaluationTests(unittest.IsolatedAsyncioTestCase):
     async def test_scores_and_assembles_response(self) -> None:
         tokenizer = Mock()
         tokenizer.encode.side_effect = lambda label, **kwargs: {
@@ -176,7 +176,7 @@ class SystemOneEvaluationTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict("sys.modules", modules):
             for mode in ("all", "staged"):
                 with self.subTest(mode=mode):
-                    register_systemone_route(submission=mode)
+                    register_evaluation_route(submission=mode)
                     route = app.add_api_route.call_args.args[1]
                     response = Mock()
                     with patch("myjev.sglang_server._evaluate_request", new_callable=AsyncMock, return_value=response) as evaluate:
@@ -277,7 +277,7 @@ class ServerArgumentTests(unittest.TestCase):
         }
         with patch.dict("sys.modules", modules):
             for option, expected in (([], "staged"), (["--submission", "all"], "all")):
-                with self.subTest(mode=expected), patch("myjev.sglang_server.register_systemone_route") as register:
+                with self.subTest(mode=expected), patch("myjev.sglang_server.register_evaluation_route") as register:
                     main(["--model-path", "local-model"] + option)
                     prepare.assert_called_with(["--model-path", "local-model"])
                     register.assert_called_once_with(submission=expected)

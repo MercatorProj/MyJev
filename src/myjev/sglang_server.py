@@ -80,7 +80,7 @@ async def _evaluate_request(
 ) -> JevResponse:
     tokenizer = tokenizer_manager.tokenizer
     if tokenizer is None:
-        raise RuntimeError("System One requires SGLang tokenization to be enabled")
+        raise RuntimeError("MyJev requires SGLang tokenization to be enabled")
 
     tasks = compile_binary_questions(request)
     renderer = DefaultPromptRenderer()
@@ -120,22 +120,22 @@ async def _evaluate_request(
     )
 
 
-def register_systemone_route(*, submission: str = "staged") -> Any:
-    """Register the System One endpoint on SGLang's existing FastAPI app."""
+def register_evaluation_route(*, submission: str = "staged") -> Any:
+    """Register MyJev's evaluation endpoint on SGLang's FastAPI app."""
     try:
         from fastapi import HTTPException
         from sglang.srt.entrypoints.http_server import app, get_global_state
     except ImportError as error:
         raise ImportError(
-            "The System One server requires the 'sglang' extra; "
+            "The MyJev server requires the 'sglang' extra; "
             "install myjev[sglang]"
         ) from error
 
     app.state.myjev_submission = submission
-    if any(getattr(route, "path", None) == "/v1/systemone" for route in app.routes):
+    if any(getattr(route, "path", None) == "/v1/myjev" for route in app.routes):
         return app
 
-    async def systemone(payload: dict[str, object]) -> dict[str, object]:
+    async def evaluate(payload: dict[str, object]) -> dict[str, object]:
         try:
             request = _parse_request(payload)
         except (TypeError, ValueError) as error:
@@ -152,7 +152,7 @@ def register_systemone_route(*, submission: str = "staged") -> Any:
         )
         return response.to_dict()
 
-    app.add_api_route("/v1/systemone", systemone, methods=["POST"])
+    app.add_api_route("/v1/myjev", evaluate, methods=["POST"])
     return app
 
 
@@ -160,11 +160,11 @@ def _validate_server_args(server_args: Any, *, submission: str = "staged") -> No
     if submission == "staged" and server_args.disable_radix_cache:
         raise ValueError("staged submission requires Radix Cache; use --submission all")
     if server_args.tokenizer_worker_num != 1:
-        raise ValueError("System One currently requires --tokenizer-worker-num 1")
+        raise ValueError("MyJev currently requires --tokenizer-worker-num 1")
     if server_args.skip_tokenizer_init:
-        raise ValueError("System One does not support --skip-tokenizer-init")
+        raise ValueError("MyJev does not support --skip-tokenizer-init")
     if server_args.grpc_mode or server_args.encoder_only or server_args.use_ray:
-        raise ValueError("System One requires SGLang's standard HTTP server")
+        raise ValueError("MyJev requires SGLang's standard HTTP server")
 
 
 def _parse_submission_args(argv: list[str]) -> tuple[str, list[str]]:
@@ -173,7 +173,7 @@ def _parse_submission_args(argv: list[str]) -> tuple[str, list[str]]:
         "--submission",
         choices=("staged", "all"),
         default="staged",
-        help="Candidate submission for /v1/systemone (default: staged).",
+        help="Candidate submission for /v1/myjev (default: staged).",
     )
     args, remaining = parser.parse_known_args(argv)
     if "--help" in remaining or "-h" in remaining:
@@ -191,7 +191,7 @@ def main(argv: list[str] | None = None) -> None:
         from sglang.srt.utils import kill_process_tree
     except ImportError as error:
         raise ImportError(
-            "The System One server requires the 'sglang' extra; "
+            "The MyJev server requires the 'sglang' extra; "
             "install myjev[sglang]"
         ) from error
 
@@ -200,7 +200,7 @@ def main(argv: list[str] | None = None) -> None:
 
     server_args = prepare_server_args(sglang_argv)
     _validate_server_args(server_args, submission=submission)
-    register_systemone_route(submission=submission)
+    register_evaluation_route(submission=submission)
     try:
         launch_server(server_args)
     finally:

@@ -50,7 +50,7 @@ class Usage:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class JevResponse:
-    """Answers produced by a model for a Jev request."""
+    """Answers produced by a model for a structured request."""
 
     model: str
     answers: Mapping[str, Answer]

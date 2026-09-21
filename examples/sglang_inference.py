@@ -1,4 +1,4 @@
-"""Evaluate a Jev request with a local SGLang engine."""
+"""Evaluate a structured request with a local SGLang engine."""
 
 import argparse
 

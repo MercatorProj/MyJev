@@ -2,18 +2,21 @@
 
 [English](usage.md) · [返回 README](../README_zh.md)
 
-本页介绍 OpenAI 兼容 API、本地 Python 调用、HTTP 服务和候选提交模式。请先完成[安装](installation_zh.md)。本地示例使用 Hugging Face 兼容的因果语言模型，请将 `/path/to/model` 替换为实际模型目录。
+MyJev 支持 OpenAI 兼容 API，以及本地 SGLang 或 Transformers 模型。本地示例中的
+`/path/to/model` 请替换为 Hugging Face 兼容的因果语言模型目录。
 
 ## OpenAI 兼容 API
 
-先在环境中设置连接信息：
+先设置连接信息：
 
 ```bash
 export OPENAI_BASE_URL="https://your-openai-compatible-service/v1"
 export OPENAI_API_KEY="your-api-key"
 ```
 
-使用 SGLang 示例中的 `state` 和 `request`，将后端替换为：
+PowerShell 使用 `$env:OPENAI_BASE_URL` 和 `$env:OPENAI_API_KEY`。
+
+下面的 `request` 使用 SGLang 示例中的完整请求。
 
 ```python
 import os
@@ -30,9 +33,10 @@ response = MyJev(backend=backend).evaluate(request)
 print(response.to_dict())
 ```
 
-`top_logprobs` 接受 1 到 20。首生成 token 的 top-logprob 窗口必须同时包含配置的 `yes_label` 和 `no_label`，否则后端无法计算分数。`max_concurrency` 控制并发提交的候选判断数量。
+首生成 token 的 top-logprob 窗口必须同时包含 `yes` 和 `no`。`top_logprobs`
+接受 1 到 20。`max_concurrency` 控制并发提交的候选判断数量。
 
-仓库示例同样支持这个后端：
+运行仓库示例：
 
 ```bash
 python examples/openai_compatible_inference.py --model your-model-name --top-logprobs 20
@@ -40,7 +44,8 @@ python examples/openai_compatible_inference.py --model your-model-name --top-log
 
 ## SGLang Python API
 
-`JevRequest` 包含 `state`、`model` 和 `questions`。下面的示例同时提交 Choice、Score 和 Noul 三种问题；本地 SGLang 后端默认使用分阶段提交：
+下面的示例同时使用 `Choice`、`Score` 和 `Noul`。本地 SGLang 后端默认使用分阶段
+提交：
 
 ```python
 from myjev import Choice, JevRequest, MyJev, Noul, Score, SGLangBackend
@@ -52,7 +57,7 @@ if __name__ == "__main__":
         state="包裹晚到了两周，信用卡还被扣了两次。",
         questions={
             "department": Choice(
-                instructions="哪个部门最应该处理这个请求？",
+                instructions="哪个部门应该处理这个请求？",
                 criteria={
                     "shipping": "物流配送问题",
                     "billing": "扣款和账单问题",
@@ -73,18 +78,18 @@ if __name__ == "__main__":
         print(response.to_dict())
 ```
 
-`submission="staged"` 可以省略；显式指定便于说明采用哪种方式。SGLang 会创建工作进程，因此脚本入口需要 `if __name__ == "__main__":`。批量处理多个请求时，可以在同一个 `with` 块内反复调用，避免重复加载模型。
+SGLang 会创建工作进程，因此脚本入口需要 `if __name__ == "__main__":`。批量处理
+多个请求时，请在同一个 `with` 块中复用后端。`engine_kwargs` 用于传入 SGLang
+引擎配置。
 
-上下文管理器会在退出时关闭引擎，`engine_kwargs` 可用于传入 SGLang 引擎配置。
-
-要将所有候选一次提交，改用：
+一次提交所有候选时改用：
 
 ```python
 with SGLangBackend(model_path, submission="all") as backend:
     response = MyJev(backend=backend).evaluate(request)
 ```
 
-仓库示例也支持切换：
+仓库示例支持两种模式：
 
 ```bash
 python examples/sglang_inference.py --model-path /path/to/model --submission staged
@@ -93,13 +98,11 @@ python examples/sglang_inference.py --model-path /path/to/model --submission all
 
 ## Transformers 后端
 
-在仅安装 Transformers 后端依赖的环境中运行示例：
+在仅安装 Transformers 后端依赖的环境中运行：
 
 ```bash
 python examples/transformers_inference.py --model-path /path/to/model
 ```
-
-使用上例的 `model_path` 和 `request`，将后端调用部分替换为：
 
 ```python
 from myjev import MyJev, TransformersBackend
@@ -109,35 +112,35 @@ response = MyJev(backend=backend).evaluate(request)
 print(response.to_dict())
 ```
 
-Transformers 后端会优先使用 CUDA；没有可用 GPU 时自动回退到 CPU。
+该后端优先使用 CUDA；没有可用 GPU 时回退到 CPU。
 
-## System One HTTP API
+## MyJev HTTP API
 
-`myjev-serve` 在 SGLang 原生 HTTP 服务上增加 `POST /v1/systemone`。
-模型列表、健康检查、鉴权和其他端点仍由 SGLang 提供。
+`myjev-serve` 在 SGLang HTTP 服务上增加 `POST /v1/myjev`。模型列表、健康检查、
+鉴权和 SGLang 原生接口保持不变。
 
 ```bash
-export LLM2JEV_API_KEY="replace-with-your-api-key"
+export MYJEV_API_KEY="replace-with-your-api-key"
 myjev-serve \
   --model-path /path/to/model \
   --served-model-name local-model \
   --host 0.0.0.0 \
   --port 30000 \
-  --api-key "$LLM2JEV_API_KEY"
+  --api-key "$MYJEV_API_KEY"
 ```
 
-查看 SGLang 原生模型列表：
+查看原生模型列表：
 
 ```bash
 curl http://localhost:30000/v1/models \
-  -H "Authorization: Bearer $LLM2JEV_API_KEY"
+  -H "Authorization: Bearer $MYJEV_API_KEY"
 ```
 
-提交 System One 请求：
+提交 MyJev 请求：
 
 ```bash
-curl http://localhost:30000/v1/systemone \
-  -H "Authorization: Bearer $LLM2JEV_API_KEY" \
+curl http://localhost:30000/v1/myjev \
+  -H "Authorization: Bearer $MYJEV_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "state": "客户的包裹一直没有送到。",
@@ -151,25 +154,23 @@ curl http://localhost:30000/v1/systemone \
   }'
 ```
 
-通过 `--submission staged|all` 选择 `/v1/systemone` 的候选提交方式，默认 `staged`。
-启动时选择的模式对该服务的所有 `/v1/systemone` 请求生效。
-Jev 请求体及 SGLang 其他原生接口不变。`staged` 依赖 Radix Cache；使用
-`--disable-radix-cache` 时需选择 `all`。模式选择建议见[下文](#哪种方式更适合我的请求)。
+通过 `--submission staged|all` 选择 `/v1/myjev` 的候选提交方式，默认 `staged`。
+`staged` 依赖 Radix Cache；`all` 可以配合 `--disable-radix-cache` 使用。该设置对
+整个服务进程生效。
 
-服务也复用 SGLang 的启动参数，目前要求使用默认的单 tokenizer HTTP 模式，
-且不能启用 `--skip-tokenizer-init`。
+服务也复用 SGLang 的启动参数，目前要求默认的单 tokenizer HTTP 模式，且不能启用
+`--skip-tokenizer-init`。
 
-## 哪种方式更适合我的请求？
+## 模式选择
 
 | 请求特点 | 建议起点 | 原因 |
 | --- | --- | --- |
 | 上下文长、候选多，相关缓存尚不存在 | `staged`（默认） | 避免冷请求内部重复处理长前缀 |
-| 输入短、候选少 | `all` | 多轮提交的开销可能超过节省的计算 |
-| 重复请求，大部分前缀已经命中缓存 | `all` | 可直接复用已有缓存，通常不需要分轮建立 |
-| 部分命中或输入差异很大 | 对比两种方式 | 是否更快取决于实际共享量和提交成本 |
+| 输入短、候选少 | `all` | 多轮提交开销可能超过收益 |
+| 重复请求，大部分前缀已命中缓存 | `all` | 可直接复用已有缓存 |
+| 部分命中或输入差异很大 | 对比两种方式 | 是否更快取决于共享量和提交成本 |
 
-目前不会探测缓存状态后自动切换模式。单候选或没有可复用前缀时，分阶段规划可以直接产生一批；有共享前缀也不代表分轮一定更快。
+MyJev 不会探测缓存状态后自动切换模式。有共享前缀也不代表分轮一定更快。
 
-实测数据和测试条件见[性能测评](shared-prefix-benchmarks_zh.md)。
-
-复用原理和输出注意事项见[共享前缀说明](shared-prefix-cache_zh.md)。
+实测数据见[性能测评](shared-prefix-benchmarks_zh.md)，复用行为见
+[共享前缀提交](shared-prefix-cache_zh.md)。

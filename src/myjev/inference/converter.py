@@ -13,7 +13,7 @@ from .prompt import DefaultPromptRenderer, PromptRenderer
 
 @dataclass(slots=True, kw_only=True)
 class MyJev:
-    """Compile, score, and assemble Jev requests."""
+    """Compile, score, and assemble structured requests."""
 
     backend: BinaryBackend
     renderer: PromptRenderer = field(default_factory=DefaultPromptRenderer)

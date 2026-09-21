@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-MyJev uses a Python `src` layout. Keep stable public imports in `src/myjev/__init__.py`. Protocol and domain objects live in `src/myjev/models/`; binary compilation, prompt rendering, normalization, and response assembly live in `src/myjev/inference/`. Shared internal JSON and probability helpers belong in `src/myjev/utils/`, not the public package API. Tests mirror these responsibilities under `tests/` using `test_<module>.py` names.
+MyJev uses a Python `src` layout. Keep stable public imports in `src/myjev/__init__.py`. Protocol and domain objects live in `src/myjev/core/`; binary compilation, prompt rendering, normalization, and response assembly live in `src/myjev/inference/`. Shared internal JSON and probability helpers belong in `src/myjev/utils/`, not the public package API. Tests mirror these responsibilities under `tests/` using `test_<module>.py` names.
 
 User-facing documentation lives in `docs/` and is version-controlled. Internal design documents live in the ignored local `dev-docs/` directory. When available, read `dev-docs/concepts.md` for the target wire behavior, `dev-docs/binary-question-design.md` for the binary-reranker approach, and `dev-docs/implementation-plan.md` for status and sequencing. Update the local plan when completing a stage or changing an architectural decision; a fresh clone may not contain these internal documents.
 
@@ -30,4 +30,4 @@ History currently contains only `Initial commit`, so no formal convention exists
 
 ## Architecture Notes
 
-The intended inference path is binary and prefill-only: compile each question candidate, read the next-token `yes`/`no` logits, and assemble Jev-compatible probabilities. Do not introduce text generation or freeze prompt field names without supporting evaluation evidence.
+The intended inference path is binary and prefill-only: compile each question candidate, read the next-token `yes`/`no` logits, and assemble normalized probabilities. Do not introduce text generation or freeze prompt field names without supporting evaluation evidence.

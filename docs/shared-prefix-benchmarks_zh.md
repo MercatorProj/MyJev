@@ -1,6 +1,6 @@
-# 共享前缀：性能测评
+# 共享前缀提交：性能测评
 
-[English](shared-prefix-benchmarks.md) · [共享前缀原理](shared-prefix-cache_zh.md)
+[English](shared-prefix-benchmarks.md) · [共享前缀提交](shared-prefix-cache_zh.md)
 
 这里的冷 KV 请求指模型和计算内核已预热，但相关输入的 KV 缓存尚不存在；热请求则可以复用已有前缀。测评比较本地 Python `SGLangBackend` 的 `all` 与 `staged` 提交方式。
 
